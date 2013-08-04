@@ -17,12 +17,14 @@ local config = {
 	console_override_print = true,
 	console_height = 0.33,
 	console_key_repeat = true,
+	console_start_open = true,
 
 	enable_remote = true,
 	font = "whitrabt.ttf",
 
 	enable_watcher = true,
 	watcher_interval = 5,
+	watcher_onchanged = "reload()"
 }
 
 -----------------------------------------------------
@@ -244,7 +246,7 @@ cupid_commands:add("reload", function(...) return cupid_reload(...) end)
 
 mods.console = function() return {
 	buffer = "",
-	shown = false,
+	shown = config.console_start_open or false,
 	lastkey = "",
 	log = {},
 	history = {},
@@ -269,7 +271,12 @@ mods.console = function() return {
 		if self.height ~= g.getHeight() * config.console_height then
 			self.height = g.getHeight() * config.console_height
 			self.lineheight = self.height / self.lines
-			self.font = g.newFont(config.font,self.lineheight)
+			local ok, font = pcall(g.newFont,config.font,self.lineheight)
+			if ok then 
+				self.font = font 
+			else
+				self.font = g.newFont(self.lineheight)
+			end
 		end
 		retaining("Color","Font", function()
 			g.setColor(0,0,0,120)
@@ -348,7 +355,7 @@ mods.console = function() return {
 			if self.shown then
 				self.keyrepeat = {love.keyboard.getKeyRepeat()}
 				love.keyboard.setKeyRepeat(0.75,0.075)
-			else
+			elseif self.keyrepeat then
 				love.keyboard.setKeyRepeat(unpack(self.keyrepeat))
 				self.keyrepeat = nil
 			end
@@ -463,6 +470,7 @@ mods.watcher = function() return {
 			local now = love.timer.getTime()
 			if now - self.lastscan < config.watcher_interval then return end
 			print("Updating...")
+			local changed = false
 			local data = self:scan()
 			if self.files == nil then
 				self.files = data
@@ -471,8 +479,12 @@ mods.watcher = function() return {
 				for k,v in pairs(data) do
 					if not old[k] or old[k] ~= v then
 						print(k .. " changed!", old[k], v)
+						changed = true
 					end
 				end
+			end
+			if changed and config.watcher_onchanged then
+				cupid_commands:command(config.watcher_onchanged)
 			end
 			self.files = data
 		else
@@ -506,7 +518,7 @@ mods.watcher = function() return {
 -----------------------------------------------------
 -- All Done!  Have fun :)
 -----------------------------------------------------
-
+print('...')
 if ( main_args[1] == "main" ) then
 	local game = loadfile('game.lua', 'bt')
 	game(main_args)
