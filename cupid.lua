@@ -26,7 +26,7 @@ local config = {
 	watcher_interval = 1.0,
 	watcher_onchanged = "reload()",
 	watcher_patterns = {"lua$"},
-	enable_physics = true,
+	enable_physics = false,
 	physics_show = false,
 	enable_temporal = true,
 
