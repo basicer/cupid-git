@@ -1,3 +1,8 @@
+-----------------------------------------------------
+-- (C) Robert Blancakert 2012
+-- Available under the same license as Love
+-----------------------------------------------------
+
 
 -----------------------------------------------------
 -- Cupid Configuration
@@ -14,7 +19,10 @@ local config = {
 	console_key_repeat = true,
 
 	enable_remote = true,
-	font = "whitrabt.ttf"
+	font = "whitrabt.ttf",
+
+	enable_watcher = true,
+	watcher_interval = 5,
 }
 
 -----------------------------------------------------
@@ -106,6 +114,10 @@ local function cupid_load(args)
 
 		if config.enable_console then
 			load_modules("console")
+		end
+
+		if config.enable_watcher then
+			load_modules("watcher")
 		end
 
 		if config.enable_remote then
@@ -244,7 +256,7 @@ mods.console = function() return {
 			print = function(...) 
 				local strings = {}
 				for k,v in pairs({...}) do strings[k] = tostring(v) end
-				self:print(unpack(strings))
+				self:print(table.concat(strings, "\t"))
 				_print(...)
 			end
 		end
@@ -434,6 +446,60 @@ mods.error = function() return {
 			love.event.push("quit")
 		end
 	end
+
+} end
+
+-----------------------------------------------------
+-- Module Watcher
+-----------------------------------------------------
+
+mods.watcher = function() return {
+	lastscan = nil,
+	["init"] = function(self) 
+	end,
+	["post-update"] = function(self, dt)
+		
+		if self.lastscan ~= nil then
+			local now = love.timer.getTime()
+			if now - self.lastscan < config.watcher_interval then return end
+			print("Updating...")
+			local data = self:scan()
+			if self.files == nil then
+				self.files = data
+			else
+				local old = self.files
+				for k,v in pairs(data) do
+					if not old[k] or old[k] ~= v then
+						print(k .. " changed!", old[k], v)
+					end
+				end
+			end
+			self.files = data
+		else
+			self.files = self:scan()
+		end
+		
+		self.lastscan = love.timer.getTime()
+	end,
+	["scan"] = function(self)
+		local out = {}
+		local function scan(where)
+			local list = love.filesystem.enumerate(where)
+			for k,v in pairs(list) do
+				local file = where .. v
+				if love.filesystem.isFile(file) then
+					local modtime, err = love.filesystem.getLastModified(file)
+					if modtime then out[v] = modtime else print(err, file) end
+
+				else
+					scan(file .. "/")
+				end
+			end
+		end
+		scan("/")
+		return out
+	end
+
 
 } end
 
