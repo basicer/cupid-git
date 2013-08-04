@@ -7,10 +7,14 @@ local config = {
 
 	always_use = true,
 
-	console_key = 96,
+	enable_console = true,
+	console_key = '`',
 	console_override_print = true,
 	console_height = 0.33,
-	enable_remote = true
+	console_key_repeat = true,
+
+	enable_remote = true,
+	font = "whitrabt.ttf"
 }
 
 -----------------------------------------------------
@@ -100,7 +104,10 @@ local function cupid_load(args)
 			modules[what] = mod
 		end
 
-		load_modules("console")
+		if config.enable_console then
+			load_modules("console")
+		end
+
 		if config.enable_remote then
 			load_modules("remote")
 		end
@@ -127,7 +134,7 @@ local cupid_commands = {
 			return "[" .. table.concat(lst, ", ") .. "]"
 		end
 	},
-	["docommand"] = function(self, cmd)
+	["command"] = function(self, cmd)
 		local xcmd = cmd
 		if not (
 			xcmd:match("end") or xcmd:match("do") or 
@@ -183,12 +190,20 @@ local cupid_keep_global = {}
 for k,v in pairs(_G) do cupid_keep_global[k] = true end
 
 local function cupid_reload(keep_globals)
+
+	if love.thread then
+		for k,v in pairs(love.thread.getThreads()) do
+			--v:kill()
+		end
+	end
+
 	-- Unload packages that got loaded
 	for k,v in pairs(package.loaded) do 
 		if not cupid_keep_package[k] then package.loaded[k] = nil end
 	end
-	
+
 	if not keep_globals then
+		setmetatable(_G, {})
 		for k,v in pairs(_G) do 
 			if not cupid_keep_global[k] then _G[k] = nil end
 		end
@@ -196,11 +211,14 @@ local function cupid_reload(keep_globals)
 
 	if modules.error then modules.error.lasterror = nil end
 
+	local game, why
 	if ( main_args[1] == "main" ) then
-		game = loadfile('game.lua', 'bt')
+		game, why = loadfile('game.lua', 'bt')
 	else
-		game = loadfile('main.lua', 'bt')
+		game, why = loadfile('main.lua', 'bt')
 	end
+	
+	if not game then cupid_error(why) return false end
 
 	xpcall(game, cupid_error)
 	if love.load then love.load() end
@@ -222,10 +240,12 @@ mods.console = function() return {
 	lines = 12,
 	["init"] = function(self)
 		if config.console_override_print then
+			local _print = print
 			print = function(...) 
 				local strings = {}
 				for k,v in pairs({...}) do strings[k] = tostring(v) end
 				self:print(unpack(strings))
+				_print(...)
 			end
 		end
 		cupid_print = function(str, color) self:print(str, color) end
@@ -237,7 +257,7 @@ mods.console = function() return {
 		if self.height ~= g.getHeight() * config.console_height then
 			self.height = g.getHeight() * config.console_height
 			self.lineheight = self.height / self.lines
-			self.font = g.newFont("UbuntuMono-R.ttf",self.lineheight)
+			self.font = g.newFont(config.font,self.lineheight)
 		end
 		retaining("Color","Font", function()
 			g.setColor(0,0,0,120)
@@ -265,7 +285,7 @@ mods.console = function() return {
 	end,
 	["pre-keypressed"] = function(self, key, unicode)
 		self.lastkey = unicode
-		if unicode == config.console_key then 
+		if key == config.console_key then 
 			self:toggle()
 			return false
 		end
@@ -274,7 +294,7 @@ mods.console = function() return {
 		
 		if unicode == 13 or unicode == 10 then
 			if ( #self.buffer > 0 ) then
-				self:docommand(self.buffer)
+				self:command(self.buffer)
 				self.buffer = ""
 			else
 				self:toggle()
@@ -303,14 +323,25 @@ mods.console = function() return {
 		end
 		if self.shown then return false end
 	end,
-	["docommand"] = function(self, cmd)
+	["command"] = function(self, cmd)
 		self.history_idx = 0
 		table.insert(self.history, 1, cmd)
 		self:print("> " .. cmd, {200, 200, 200})
-		local ok, result = cupid_commands:docommand(cmd)
+		local ok, result = cupid_commands:command(cmd)
 		self:print(result, ok and {255, 255, 255} or {255, 0, 0})
 	end,
-	["toggle"] = function(self) self.shown = not self.shown end,
+	["toggle"] = function(self) 
+		self.shown = not self.shown 
+		if config.console_key_repeat then
+			if self.shown then
+				self.keyrepeat = {love.keyboard.getKeyRepeat()}
+				love.keyboard.setKeyRepeat(0.75,0.075)
+			else
+				love.keyboard.setKeyRepeat(unpack(self.keyrepeat))
+				self.keyrepeat = nil
+			end
+		end
+	end,
 	["print"] = function(self, what, color)
 		table.insert(self.log, 1, {what, color or {255,255,255,255}})
 		for i=self.lines+1,#self.log do self.log[i] = nil end
@@ -338,7 +369,7 @@ mods.remote = function()
 		local a, b = self.socket:receive(100)
 		if a then
 			print("Remote: " .. a)
-			cupid_commands:docommand(a)
+			cupid_commands:command(a)
 		end
 	end
 	}
@@ -368,7 +399,7 @@ mods.error = function() return {
 			local oy = g.getWidth() * 0.1;
 			if self.height ~= g.getHeight() * config.console_height then
 				self.height = g.getHeight() * config.console_height
-				self.font = g.newFont("UbuntuMono-R.ttf",g.getHeight() / 40)
+				self.font = g.newFont(config.font,g.getHeight() / 40)
 			end
 			local hh = g.getHeight() / 20
 			g.setColor(0, 0, 0, 128)
@@ -411,7 +442,7 @@ mods.error = function() return {
 -----------------------------------------------------
 
 if ( main_args[1] == "main" ) then
-	game = loadfile('game.lua', 'bt')
+	local game = loadfile('game.lua', 'bt')
 	game(main_args)
 	love.main = cupid_load
 else
