@@ -22,7 +22,7 @@ Installing
 Use
 ---
 
-While your game is running, press tilde ( ` ) to activate the
+While your game is running, press tilde ( ~ ) to activate the
 console.  Print commands will show here.  Type `reload` to 
 reload your game.
 
