@@ -3,12 +3,13 @@ Cupid
 
 Cupid is a debugging shim for Love2d.
 
-Features:
+Features
+--------
 
 * Developer console, displays print messages and executes lua.
 * Game error detection and recovery.
 * Can render a physics debug layer.
-* Reload game sourcecode on the fly.
+* Reload game sourcecode on the fly automaticly.
 
 
 Installing
@@ -29,7 +30,8 @@ reload your game.
 Automatic Reloading
 -------------------
 
-By default cupid listens for console commands on UDP port 10137.
+By default cupid will monitor all .lua files in the project directory, scanning it every so often.  It's somewhat more efficient to turn this off and use UP commands.  The remote module listens for console commands on UDP port 10137.
+
 This command works well:
 
 `watchmedo-2.7 shell-command --command='echo reload | nc -u localhost 10173' .`
